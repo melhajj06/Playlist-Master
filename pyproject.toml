@@ -6,7 +6,11 @@ authors = [
 ]
 readme = "README.md"
 license-files = ["LICENSE.txt"]
-dependencies = []
+dependencies = [
+  "click",
+  "spotipy",
+  "yt-dlp"
+]
 
 [build-system]
 requires = ["setuptools"]
@@ -14,7 +18,7 @@ build-backend = "setuptools.build_meta"
 
 [project.optional-dependencies]
 PDF = [
-    "pytest"
+  "pytest"
 ]
 
 [tool.pytest.ini_options]
