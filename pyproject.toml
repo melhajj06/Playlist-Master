@@ -1,5 +1,5 @@
 [project]
-name = "spytplconv"
+name = "playlist-master"
 version = "1.0.0"
 authors = [
 	{name = "melhajj06"},
@@ -23,5 +23,5 @@ PDF = [
 
 [tool.pytest.ini_options]
 pythonpath = [
-  "spytplconv"
+  "playlist_master"
 ]
