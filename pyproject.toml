@@ -1,0 +1,23 @@
+[project]
+name = "spytplconv"
+version = "1.0.0"
+authors = [
+	{name = "melhajj06"},
+]
+readme = "README.md"
+license-files = ["LICENSE.txt"]
+dependencies = []
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project.optional-dependencies]
+PDF = [
+    "pytest"
+]
+
+[tool.pytest.ini_options]
+pythonpath = [
+  "spytplconv"
+]
