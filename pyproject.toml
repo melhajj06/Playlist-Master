@@ -9,7 +9,10 @@ license-files = ["LICENSE.txt"]
 dependencies = [
   "click",
   "spotipy",
-  "yt-dlp"
+  "yt-dlp",
+  "ytmusicapi",
+  "Pillow",
+  "music-tag"
 ]
 
 [build-system]

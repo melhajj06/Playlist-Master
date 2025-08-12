@@ -1,0 +1,14 @@
+[playlist-master]
+    playlist_id = "PL2MI040U_GXobmpXtTwBF7oHBGT5BETSD"
+    platform = "youtube"
+
+[yt-dlp]
+    options = "-o \"path/to/output/dir/%(uploader)s - %(title)s.%(ext)s\" -x --windows-filenames --cookies-from-browser firefox --audio-format flac --ffmpeg-location \"path/to/ffmpeg\""
+
+[yt-oauth]
+    client_id = "your_client_id"
+    client_secret = "your_client_secret"
+
+[sp-oauth]
+    client_id = "your_client_id"
+    client_secret = "your_client_secret"

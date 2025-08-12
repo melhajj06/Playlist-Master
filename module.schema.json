@@ -1,0 +1,82 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Playlist Master Config Schema",
+    "description": "JSON Schema for the playlist-master .toml config file",
+    "type": "object",
+    "properties": {
+        "playlist-master": {
+            "type": "object",
+            "description": "Table for playlist-master options",
+            "properties": {
+                "playlist_id": {
+                    "type": "string",
+                    "description": "The ID of the playlist"
+                },
+                "platform": {
+                    "enum": ["youtube", "spotify"],
+                    "description": "The platform on which the playlist exists"
+                },
+                "thumbnail_quality": {
+                    "enum": ["default", "medium", "high", "standard", "maxres"],
+                    "description": "The quality of the thumbnail to download from YouTube"
+                },
+                "genlogs": {
+                    "type": "boolean",
+                    "description": "Whether to generate logs or not"
+                },
+                "logdir": {
+                    "type": "string",
+                    "description": "The directory in which to place the log file"
+                },
+                "loglevel": {
+                    "enum": ["notset", "info", "warning", "error", "critical", "debug"],
+                    "description": "The logging level of which to show in log file"
+                }
+            }
+        },
+        "yt-dlp": {
+            "type": "object",
+            "description": "Table for yt-dlp options",
+            "properties": {
+                "options": {
+                    "type": "string",
+                    "description": "The command line options to use for yt-dlp"
+                }
+            }
+        },
+        "yt-oauth": {
+            "type": "object",
+            "description": "Table for YouTube Data API v3 credentials",
+            "properties": {
+                "client_id": {
+                    "type": "string",
+                    "description": "The OAuth 2.0 client id"
+                },
+                "client_secret": {
+                    "type": "string",
+                    "description": "The OAuth 2.0 client secret"
+                }
+            }
+        },
+        "sp-oauth": {
+            "type": "object",
+            "description": "Table for Spotify Web API credentials",
+            "properties": {
+                "client_id": {
+                    "type": "string",
+                    "description": "The OAuth 2.0 client id"
+                },
+                "client_secret": {
+                    "type": "string",
+                    "description": "The OAuth 2.0 client secret"
+                }
+            }
+        }
+    },
+    "required": [
+        "playlist-master",
+        "yt-dlp",
+        "yt-oauth",
+        "sp-oauth"
+    ]
+}
