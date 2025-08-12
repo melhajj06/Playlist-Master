@@ -22,7 +22,7 @@
                 },
                 "genlogs": {
                     "type": "boolean",
-                    "description": "Whether to generate logs or not"
+                    "description": "Whether to generate logs in a file or not"
                 },
                 "logdir": {
                     "type": "string",

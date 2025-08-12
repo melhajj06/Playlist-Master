@@ -135,7 +135,7 @@ class Track:
         return None if date is None else date.split('-')[0]
 
 
-def download_playlist(loglevel=logging.INFO, config_path=CONFIG_DEFAULT_PATH, **kwargs):
+def download_playlist(config_path=CONFIG_DEFAULT_PATH, **kwargs):
     logger = logging.getLogger(__name__)
     
     cpath = config_path
@@ -166,12 +166,15 @@ def download_playlist(loglevel=logging.INFO, config_path=CONFIG_DEFAULT_PATH, **
         opts["yt-oauth"] = None
 
     for key, value in kwargs.items():
-        if key == "yt-dlp":
+        if not value:
+            continue
+
+        if key == "yt_dlp":
             opts["yt-dlp"]["options"] = value
-        elif key == "yt-oauth":
+        elif key == "yt_oauth":
             credentials = ytm.setup_oauth(value["client_id"], value["client_secret"])
             opts["yt-oauth"] = credentials
-        elif key == ["sp-oauth"]:
+        elif key == ["sp_oauth"]:
             opts["sp-oauth"] = value
         else:
             opts["playlist-master"][key] = value
@@ -180,6 +183,9 @@ def download_playlist(loglevel=logging.INFO, config_path=CONFIG_DEFAULT_PATH, **
     if "logdir" in opts["playlist-master"]:
         logdir = opts["playlist-master"]["logdir"]
 
+    loglevel = logging.INFO
+    if "loglevel" in opts["playlist-master"]:
+        loglevel = opts["playlist-master"]["loglevel"]
     logging.basicConfig(filename=logdir, encoding="utf-8", filemode='w', format="%(asctime)s %(levelname)s: %(message)s", datefmt=r"%Y-%m-%d %H:%M:%S_(%Z)", level=loglevel)
 
     if not opts["yt-oauth"]:
