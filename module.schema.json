@@ -31,6 +31,10 @@
                 "loglevel": {
                     "enum": ["notset", "info", "warning", "error", "critical", "debug"],
                     "description": "The logging level of which to show in log file"
+                },
+                "cookie_headers_path": {
+                    "type": "boolean",
+                    "description": "Whether to use a client id and secret or an exported cookies .json file"
                 }
             }
         },
@@ -55,8 +59,27 @@
                 "client_secret": {
                     "type": "string",
                     "description": "The OAuth 2.0 client secret"
+                },
+                "cookie_headers_path": {
+                    "type": "string",
+                    "description": "The path to a .json file containing exported browser cookie headers"
                 }
-            }
+            },
+            "oneOf": [
+                {
+                    "required": ["client_id", "client_secret"],
+                    "properties": {
+                        "cookie_headers_path": false
+                    }
+                },
+                {
+                    "required": ["cookie_headers_path"],
+                    "properties": {
+                        "client_id": false,
+                        "client_secret": false
+                    }
+                }
+            ]
         },
         "sp-oauth": {
             "type": "object",
