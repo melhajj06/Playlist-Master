@@ -3,8 +3,8 @@ import os
 import logging
 import shlex
 import tomllib
+import datetime as dt
 from logging import Logger
-from pathlib import Path
 from urllib.request import urlopen
 
 # external dependencies
@@ -144,13 +144,13 @@ def download_playlist(config_path=CONFIG_DEFAULT_PATH, **kwargs):
         
         with open(cpath, 'w') as opts:
             lines = [
-                "[playlist-master]",
-                "",
-                "[yt-dlp]",
-                "",
-                "[yt-oauth]",
-                "",
-                "[sp-oauth]"
+                "[playlist-master]\n",
+                "\n",
+                "[yt-dlp]\n",
+                "\n",
+                "[yt-oauth]\n",
+                "\n",
+                "[sp-oauth]\n"
             ]
             opts.writelines(lines)
 
@@ -160,10 +160,14 @@ def download_playlist(config_path=CONFIG_DEFAULT_PATH, **kwargs):
 
     temp_client = None
     temp_secret = None
-    if len(opts["yt-oauth"]) > 0:
-        temp_client = opts["yt-oauth"]["client_id"]
-        temp_secret = opts["yt-oauth"]["client_secret"]
-        opts["yt-oauth"] = None
+    temp_cookie_headers = None
+    if opts["yt-oauth"]:
+        if "cookie_headers" in opts["playlist-master"] and "cookie_headers_path" in opts["yt-oauth"]:
+            temp_cookie_headers = opts["yt-oauth"]["cookie_headers_path"]
+        elif "client_id" in opts["yt-oauth"] and "client_secret" in opts["yt-oauth"]:
+            temp_client = opts["yt-oauth"]["client_id"]
+            temp_secret = opts["yt-oauth"]["client_secret"]
+            opts["yt-oauth"] = None
 
     for key, value in kwargs.items():
         if not value:
@@ -172,7 +176,11 @@ def download_playlist(config_path=CONFIG_DEFAULT_PATH, **kwargs):
         if key == "yt_dlp":
             opts["yt-dlp"]["options"] = value
         elif key == "yt_oauth":
-            credentials = ytm.setup_oauth(value["client_id"], value["client_secret"])
+            credentials = None
+            if kwargs["cookie_headers"]:
+                credentials = ytm.setup(headers_raw=value)
+            else:
+                credentials = ytm.setup_oauth(value["client_id"], value["client_secret"])
             opts["yt-oauth"] = credentials
         elif key == ["sp_oauth"]:
             opts["sp-oauth"] = value
@@ -186,17 +194,23 @@ def download_playlist(config_path=CONFIG_DEFAULT_PATH, **kwargs):
     loglevel = logging.INFO
     if "loglevel" in opts["playlist-master"]:
         loglevel = opts["playlist-master"]["loglevel"]
-    logging.basicConfig(filename=logdir, encoding="utf-8", filemode='w', format="%(asctime)s %(levelname)s: %(message)s", datefmt=r"%Y-%m-%d %H:%M:%S_(%Z)", level=loglevel)
+
+    date = dt.datetime.now().date().strftime(r"%Y-%m-%d")
+    time = dt.datetime.now().time().strftime(r"%H-%M-%S")
+    filename = os.path.join(logdir, f"{date}_{time}_playlist-master.log")
+    logging.basicConfig(filename=(filename if opts["playlist-master"]["genlogs"] else None), encoding="utf-8", filemode='w', format="%(asctime)s %(levelname)s: %(message)s", datefmt=r"%Y-%m-%d %H:%M:%S_(%Z)", level=loglevel)
 
     if not opts["yt-oauth"]:
         if temp_client and temp_secret:
-            opts["yt-oauth"] = ytm.setup_oauth(temp_client, temp_secret)
+            opts["yt-oauth"] = ytm.setup_oauth(temp_client, temp_secret, open_browser=True)
+        elif temp_cookie_headers:
+            opts["yt-oauth"] = ytm.setup(headers_raw=temp_cookie_headers)
         else:
-            logger.warning("no youtube authentication credentials provided")
-            opts["yt-oauth"] = ytm.setup_oauth()
+            logger.error("no youtube authentication credentials provided")
+            return
         
     if cpath != config_path:
-        logger.warning("Config path not found. Using default path and config at: %s", cpath)
+        logger.warning("config path not found. using default path and config at: %s", cpath)
     
     if opts["platform"] == "spotify":
         download_spotify_playlist(opts["playlist_id"], opts, logger)
@@ -268,7 +282,7 @@ def download_youtube_playlist(playlistID, config, logger):
 
 def get_spotify_tracks(playlistID, credentials):
     client_credentials_manager = SpotifyClientCredentials(credentials["client_id"], credentials["client_secret"])
-    spotify = sp.Spotify(client_credentials_manager=client_credentials_manager)
+    spotify = sp.Spotify(client_credentials_manager=True)
     results = spotify.playlist_items(playlist_id=playlistID)
 
     if not results:

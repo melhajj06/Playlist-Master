@@ -1,5 +1,7 @@
 import click
 from .downloader import download_playlist
+import pathlib
+import os
 
 @click.group("playlist-master")
 def cli():
@@ -7,9 +9,14 @@ def cli():
 
 
 @cli.command()
+@click.argument(
+    "playlist_id",
+    required=False,
+    nargs=1
+)
 @click.option(
     "-c", "--config",
-    type=click.File('r'),
+    type=click.Path(file_okay=True, dir_okay=False),
     help="A path to a config file to be used by the program. Options and flags passed into the CLI while a config is specified will take precedence over the options in the config."
 )
 @click.option(
@@ -26,6 +33,7 @@ def cli():
 @click.option(
     "-g", "--genlogs",
     is_flag=True,
+    default=True,
     help="Whether to generate logs in a file or directly in the terminal."
 )
 @click.option(
@@ -35,7 +43,7 @@ def cli():
 )
 @click.option(
     "-e", "--log-level",
-    "log_level",
+    "loglevel",
     type=click.Choice(["notset", "info", "warning", "error", "critical", "debug"], case_sensitive=False),
     help="The level at which to log messages."
 )
@@ -47,8 +55,7 @@ def cli():
 @click.option(
     "-y", "--yt-oauth",
     "yt_oauth",
-    nargs=2,
-    help="A client id and client secret used for Google's OAuth."
+    help="A client id and client secret used for Google's OAuth separated by a comma. If the `-h` or `--cookie-headers` flag is specified, a .json file containing the exported headers is used as the option's parameter."
 )
 @click.option(
     "-s", "--sp-oauth",
@@ -56,17 +63,44 @@ def cli():
     nargs=2,
     help="A client id and client secret used for Spotify's OAuth."
 )
-@click.argument("playlist_id")
-def download(config, platform, thumbnail_quality, genlogs, logdir, loglevel, yt_dlp, yt_oauth, sp_oauth, playlist_id=None):
+@click.option(
+    "-k", "--cookie-headers",
+    "cookie_headers",
+    is_flag=True,
+    help="Whether to use exported headers from a browser to authenticate for Google's OAuth or client keys."
+)
+def download(playlist_id, config, platform, thumbnail_quality, genlogs, logdir, loglevel, yt_dlp, yt_oauth, sp_oauth, cookie_headers):
+    yauth = None
+
+    if yt_oauth:
+        if cookie_headers:
+            if ',' in yt_oauth:
+                raise click.BadParameter("yt-oauth option with cookie-headers flag must be a file path with no commas")
+            
+            if os.path.exists(yt_oauth):
+                if not os.path.isfile(yt_oauth):
+                    raise click.BadParameter(f"File: '{yt_oauth}' is not a file")
+            else:
+                raise click.BadParameter(f"File: '{yt_oauth}' does not exist")
+            
+            yauth = yt_oauth
+        else:
+            if ',' not in yt_oauth:
+                raise click.BadParameter("yt-oauth option must have 2 values separated by a comma with no space")
+            
+            keys = yt_oauth.split(',')
+            yauth = {"client_id": keys[0], "client_secret": keys[1]}
+    
     download_playlist(
-        config_path=config,
+        config_path=str(config),
         platform=platform,
         thumbnail_quality=thumbnail_quality,
         genlogs=genlogs,
         logdir=logdir,
         loglevel=loglevel,
         yt_dlp=yt_dlp,
-        yt_oauth=({"client_id": yt_oauth[0], "client_secret": yt_oauth[1]} if yt_oauth else None),
+        yt_oauth=yauth,
         sp_oauth=({"client_id": sp_oauth[0], "client_secret": sp_oauth[1]} if sp_oauth else None),
-        playlist_id=playlist_id
+        playlist_id=playlist_id,
+        cookie_headers=cookie_headers
     )
