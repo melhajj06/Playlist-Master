@@ -1,5 +1,5 @@
 {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$schema": "http://json-schema.org/draft-04/schema#",
     "title": "Playlist Master Config Schema",
     "description": "JSON Schema for the playlist-master .toml config file",
     "type": "object",
@@ -32,7 +32,7 @@
                     "enum": ["notset", "info", "warning", "error", "critical", "debug"],
                     "description": "The logging level of which to show in log file"
                 },
-                "cookie_headers_path": {
+                "cookie_headers": {
                     "type": "boolean",
                     "description": "Whether to use a client id and secret or an exported cookies .json file"
                 }
@@ -68,15 +68,21 @@
             "oneOf": [
                 {
                     "required": ["client_id", "client_secret"],
-                    "properties": {
-                        "cookie_headers_path": false
+                    "not": {
+                        "required": ["cookie_headers_path"]
                     }
                 },
                 {
                     "required": ["cookie_headers_path"],
-                    "properties": {
-                        "client_id": false,
-                        "client_secret": false
+                    "not": {
+                        "anyOf": [
+                            {
+                                "required": ["client_id"]
+                            },
+                            {
+                                "required": ["client_secret"]
+                            }
+                        ]
                     }
                 }
             ]

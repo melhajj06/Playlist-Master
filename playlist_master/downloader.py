@@ -6,6 +6,7 @@ import tomllib
 import datetime as dt
 from logging import Logger
 from urllib.request import urlopen
+from enum import Enum
 
 # external dependencies
 import yt_dlp as yt
@@ -15,11 +16,23 @@ import spotipy as sp
 from spotipy.oauth2 import SpotifyClientCredentials
 from ytmusicapi import YTMusic
 
+# TODO:
+# - docs
+# - integrate music output dir option
+# - add options for creating directories automatically
+# - dont create config if none exists
 
 # default paths
 CONFIG_DEFAULT_PATH = r"./config.toml"
 LOG_DEFAULT_DIR = r"./log"
 OUTPUT_DEFAULT_DIR = r"./music"
+
+class ThumbnailQuality(Enum):
+    DEFAULT = 0
+    MEDIUM = 1
+    HIGH = 2
+    STANDARD = 3
+    MAXRES = 4
 
 
 class YtDlpLogger:
@@ -45,7 +58,7 @@ class YtDlpLogger:
         else:
             self.info(msg)
 
-        self.logger.debug("", f"{msg}\n")
+        self.logger.debug(msg)
 
     def info(self, msg: str):
         """Logs an info message
@@ -53,7 +66,7 @@ class YtDlpLogger:
         :param str msg: the message to log
         """
 
-        self.logger.info("", f"{msg}\n")
+        self.logger.info(msg)
 
     def warning(self, msg: str):
         """Logs a warning message
@@ -61,7 +74,7 @@ class YtDlpLogger:
         :param str msg: the message to log
         """
 
-        self.logger.warning("", f"{msg}\n")
+        self.logger.warning(msg)
 
     def error(self, msg: str):
         """Logs an error message
@@ -69,7 +82,7 @@ class YtDlpLogger:
         :param str msg: the message to log
         """
 
-        self.logger.error("", f"{msg}\n")
+        self.logger.error(msg)
 
 
 class Track:
@@ -108,20 +121,20 @@ class Track:
             return None
         
     @staticmethod
-    def get_youtube_track_info(track, thumbnail_quality, logger=None):
+    def get_youtube_track_info(track, thumbnail_quality, album, logger=None):
         try:
-            album = get_yt_album(track["album"]["id"])
-            track_misc_info = list(filter(lambda t: t["id"] == track["id"], album))
+            tl = len(track["thumbnails"]) 
+            track_misc_info = None if not album else list(filter(lambda t: t["id"] == track["id"], album))
             return Track(
                 [artist["name"] for artist in track["artists"]],
-                [artist["name"] for artist in album],
+                [track["artists"][0]["name"]] if not album else [artist["name"] for artist in album],
                 track["title"],
-                album["title"],
-                album["year"],
-                track["thumbnails"][thumbnail_quality]["url"],
-                track_misc_info["trackNumber"],
-                album["trackCount"],
-                -1,
+                "Singles" if not album else album["title"],
+                None if not album else album["year"],
+                track["thumbnails"][min(tl - 1, thumbnail_quality)]["url"],
+                None if not track_misc_info else track_misc_info["trackNumber"],
+                None if not album else album["trackCount"],
+                None,
                 track["isExplicit"]
             )
         except Exception as e:
@@ -136,8 +149,6 @@ class Track:
 
 
 def download_playlist(config_path=CONFIG_DEFAULT_PATH, **kwargs):
-    logger = logging.getLogger(__name__)
-    
     cpath = config_path
     if not os.path.exists(config_path):
         cpath = CONFIG_DEFAULT_PATH
@@ -167,7 +178,7 @@ def download_playlist(config_path=CONFIG_DEFAULT_PATH, **kwargs):
         elif "client_id" in opts["yt-oauth"] and "client_secret" in opts["yt-oauth"]:
             temp_client = opts["yt-oauth"]["client_id"]
             temp_secret = opts["yt-oauth"]["client_secret"]
-            opts["yt-oauth"] = None
+        opts["yt-oauth"] = None
 
     for key, value in kwargs.items():
         if not value:
@@ -178,7 +189,7 @@ def download_playlist(config_path=CONFIG_DEFAULT_PATH, **kwargs):
         elif key == "yt_oauth":
             credentials = None
             if kwargs["cookie_headers"]:
-                credentials = ytm.setup(headers_raw=value)
+                credentials = value
             else:
                 credentials = ytm.setup_oauth(value["client_id"], value["client_secret"])
             opts["yt-oauth"] = credentials
@@ -195,31 +206,35 @@ def download_playlist(config_path=CONFIG_DEFAULT_PATH, **kwargs):
     if "loglevel" in opts["playlist-master"]:
         loglevel = opts["playlist-master"]["loglevel"]
 
+    logger = logging.getLogger(__name__)
     date = dt.datetime.now().date().strftime(r"%Y-%m-%d")
     time = dt.datetime.now().time().strftime(r"%H-%M-%S")
     filename = os.path.join(logdir, f"{date}_{time}_playlist-master.log")
-    logging.basicConfig(filename=(filename if opts["playlist-master"]["genlogs"] else None), encoding="utf-8", filemode='w', format="%(asctime)s %(levelname)s: %(message)s", datefmt=r"%Y-%m-%d %H:%M:%S_(%Z)", level=loglevel)
+    logging.basicConfig(filename=(filename if opts["playlist-master"]["genlogs"] else None), encoding="utf-8", filemode='w', format="%(asctime)s %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S (%Z)", level=loglevel)
 
     if not opts["yt-oauth"]:
         if temp_client and temp_secret:
             opts["yt-oauth"] = ytm.setup_oauth(temp_client, temp_secret, open_browser=True)
         elif temp_cookie_headers:
-            opts["yt-oauth"] = ytm.setup(headers_raw=temp_cookie_headers)
+            opts["yt-oauth"] = temp_cookie_headers
         else:
             logger.error("no youtube authentication credentials provided")
             return
         
     if cpath != config_path:
         logger.warning("config path not found. using default path and config at: %s", cpath)
-    
-    if opts["platform"] == "spotify":
-        download_spotify_playlist(opts["playlist_id"], opts, logger)
+
+    platform = opts["playlist-master"]["platform"].lower()
+    if platform == "spotify":
+        download_spotify_playlist(opts["playlist-master"]["playlist_id"], opts, logger)
+    elif platform == "youtube":
+        download_youtube_playlist(opts["playlist-master"]["playlist_id"], opts, logger)
 
 
 def download_spotify_playlist(playlistID, config, logger):
-    ytauth = YTMusic(config.get("ytmusicapi-oauth"))
-    spauth = config.get("spotipy-oauth")
-    ytdlp_options = yt.parse_options(shlex.split(config.get("yt-dlp")["options"])).ydl_opts
+    ytauth = YTMusic(config["yt-oauth"])
+    spauth = config["sp-oauth"]
+    ytdlp_options = yt.parse_options(shlex.split(config["yt-dlp"]["options"])).ydl_opts
     ytdlp_options["logger"] = YtDlpLogger(logger)
     outputs = []
         
@@ -228,7 +243,7 @@ def download_spotify_playlist(playlistID, config, logger):
         if not track:
             logger.error("unable to retrieve track")
             continue
-        
+
         try:
             logger.info(f"searching for: {track.artists[0] if track.artists[0] else "NoneType"} {track.title if track.title else "NoneType"}")
             url = search_yt(track.title, track.artists[0], ytauth)
@@ -257,21 +272,24 @@ def download_spotify_playlist(playlistID, config, logger):
 
 
 def download_youtube_playlist(playlistID, config, logger):
-    ytauth = YTMusic(config.get("yt-oauth"))
-    ytdlp_options = yt.parse_options(shlex.split(config.get("yt-dlp")["options"])).ydl_opts
+    ytauth = YTMusic(config["yt-oauth"])
+    ytdlp_options = yt.parse_options(shlex.split(config["yt-dlp"]["options"])).ydl_opts
     ytdlp_options["logger"] = YtDlpLogger(logger)
     outputs = []
 
     tracks = get_yt_tracks(playlistID, ytauth)
     for track in tracks:
-        url = f"https://music.youtube.com/watch?v={track["id"]}"
+        url = f"https://music.youtube.com/watch?v={track["videoId"]}"
         logger.info("downloading from url: %s", url)
         download(url, ytdlp_options, outputs)
         if not outputs[-1]:
             logger.warning("unable to apply metadata")
             continue
         
-        track_info = Track.get_spotify_track_info(track, config["playlist-master"]["thumbnail_quality"] if "thumbnail_quality" in config["playlist-master"] else "medium", logger)
+        track_info = Track.get_youtube_track_info(track, ThumbnailQuality[config["playlist-master"]["thumbnail_quality"].upper()].value if "thumbnail_quality" in config["playlist-master"] else 0, ytauth.get_yt_album(track["album"]["id"]) if track["album"] else None, logger)
+        if not track_info:
+            logger.warning("problem retrieving track info for applying metadata; continuing")
+            continue
         m = music_tag.load_file(outputs[-1])
         r = apply_metadata(m, track_info, logger)
         if r:
@@ -282,7 +300,7 @@ def download_youtube_playlist(playlistID, config, logger):
 
 def get_spotify_tracks(playlistID, credentials):
     client_credentials_manager = SpotifyClientCredentials(credentials["client_id"], credentials["client_secret"])
-    spotify = sp.Spotify(client_credentials_manager=True)
+    spotify = sp.Spotify(client_credentials_manager=client_credentials_manager)
     results = spotify.playlist_items(playlist_id=playlistID)
 
     if not results:
@@ -298,10 +316,6 @@ def get_spotify_tracks(playlistID, credentials):
 
 def get_yt_tracks(playlistID, credentials: YTMusic):
     return credentials.get_playlist(playlistID, limit=None)["tracks"]
-
-
-def get_yt_album(albumID, credentials: YTMusic):
-    return credentials.get_album(albumID)
 
 
 def search_yt(artist, song_name, ytauth, explicit=False):
@@ -324,14 +338,16 @@ def apply_metadata(file, metadata, logger):
         file["tracktitle"] = metadata.title
         file["artist"] = "; ".join(metadata.artists)
         file["albumartist"] = "; ".join(metadata.album_artists)
-        if not metadata.album_title is None:
+        if metadata.album_title:
             file["album"] = metadata.album_title
         file["year"] = metadata.release_date
         file["artwork"] = urlopen(metadata.art_url).read()
-        if metadata.disc_number >= 0:
+        if metadata.disc_number:
             file["discnumber"] = metadata.disc_number
-        file["tracknumber"] = metadata.track_number
-        file["totaltracks"] = metadata.total_tracks
+        if metadata.track_number:
+            file["tracknumber"] = metadata.track_number
+        if metadata.total_tracks:
+            file["totaltracks"] = metadata.total_tracks
         file.save()
         return 1
     except Exception as e:
