@@ -35,6 +35,10 @@
                 "cookie_headers": {
                     "type": "boolean",
                     "description": "Whether to use a client id and secret or an exported cookies .json file"
+                },
+                "sort": {
+                    "type": "boolean",
+                    "description": "Whether to sort the output files by artist and album"
                 }
             }
         },

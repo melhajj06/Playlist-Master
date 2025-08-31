@@ -16,13 +16,19 @@ def cli():
 )
 @click.option(
     "-c", "--config",
-    type=click.Path(file_okay=True, dir_okay=False),
+    type=click.Path(file_okay=True, dir_okay=False, exists=True),
     help="A path to a config file to be used by the program. Options and flags passed into the CLI while a config is specified will take precedence over the options in the config."
 )
 @click.option(
     "-p", "--platform",
     type=click.Choice(["spotify", "youtube"], case_sensitive=False),
     help="The platform from which to download the playlist."
+)
+@click.option(
+    "-r", "--sort",
+    is_flag=True,
+    default=False,
+    help="Whether to sort the output files by artist and album."
 )
 @click.option(
     "-q", "--thumbnail-quality",
@@ -55,7 +61,7 @@ def cli():
 @click.option(
     "-y", "--yt-oauth",
     "yt_oauth",
-    help="A client id and client secret used for Google's OAuth separated by a comma. If the `-h` or `--cookie-headers` flag is specified, a .json file containing the exported headers is used as the option's parameter."
+    help="A client id and client secret used for Google's OAuth separated by a comma. If the `-k`/`--cookie-headers` flag is specified, a .json filepath containing the exported headers is used as the option's parameter."
 )
 @click.option(
     "-s", "--sp-oauth",
@@ -69,7 +75,7 @@ def cli():
     is_flag=True,
     help="Whether to use exported headers from a browser to authenticate for Google's OAuth or client keys."
 )
-def download(playlist_id, config, platform, thumbnail_quality, genlogs, logdir, loglevel, yt_dlp, yt_oauth, sp_oauth, cookie_headers):
+def download(playlist_id, config, platform, thumbnail_quality, genlogs, logdir, loglevel, yt_dlp, yt_oauth, sp_oauth, cookie_headers, sort):
     yauth = None
 
     if yt_oauth:
@@ -92,7 +98,7 @@ def download(playlist_id, config, platform, thumbnail_quality, genlogs, logdir, 
             yauth = {"client_id": keys[0], "client_secret": keys[1]}
     
     download_playlist(
-        config_path=str(config),
+        config_path=str(config) if config else None,
         platform=platform,
         thumbnail_quality=thumbnail_quality,
         genlogs=genlogs,
@@ -102,5 +108,6 @@ def download(playlist_id, config, platform, thumbnail_quality, genlogs, logdir, 
         yt_oauth=yauth,
         sp_oauth=({"client_id": sp_oauth[0], "client_secret": sp_oauth[1]} if sp_oauth else None),
         playlist_id=playlist_id,
-        cookie_headers=cookie_headers
+        cookie_headers=cookie_headers,
+        sort=sort
     )

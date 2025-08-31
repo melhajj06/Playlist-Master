@@ -124,10 +124,12 @@ class Track:
     def get_youtube_track_info(track, thumbnail_quality, album, logger=None):
         try:
             tl = len(track["thumbnails"]) 
-            track_misc_info = None if not album else list(filter(lambda t: t["id"] == track["id"], album))
+            track_misc_info = None if not album else list(filter(lambda t: t["videoId"] == track["videoId"], album["tracks"]))
+            if track_misc_info and len(track_misc_info) == 0:
+                track_misc_info = None
             return Track(
                 [artist["name"] for artist in track["artists"]],
-                [track["artists"][0]["name"]] if not album else [artist["name"] for artist in album],
+                [track["artists"][0]["name"]] if not album else [artist["name"] for artist in album["artists"]],
                 track["title"],
                 "Singles" if not album else album["title"],
                 None if not album else album["year"],
@@ -144,30 +146,21 @@ class Track:
             return None
 
     @staticmethod
-    def format_date(date: str, precision):
+    def format_date(date: str):
         return None if date is None else date.split('-')[0]
 
 
-def download_playlist(config_path=CONFIG_DEFAULT_PATH, **kwargs):
-    cpath = config_path
-    if not os.path.exists(config_path):
-        cpath = CONFIG_DEFAULT_PATH
-        
-        with open(cpath, 'w') as opts:
-            lines = [
-                "[playlist-master]\n",
-                "\n",
-                "[yt-dlp]\n",
-                "\n",
-                "[yt-oauth]\n",
-                "\n",
-                "[sp-oauth]\n"
-            ]
-            opts.writelines(lines)
-
+def download_playlist(config_path, **kwargs):
     opts: dict[str: str | int | bool | dict] = {}
-    with open(cpath, "rb") as config:
-        opts = tomllib.load(config)
+
+    if not config_path or not os.path.exists(config_path):
+        opts["playlist-master"] = None
+        opts["yt-dlp"] = None
+        opts["yt-oauth"] = None
+        opts["sp-oauth"] = None
+    else:
+        with open(config_path, "rb") as config:
+            opts = tomllib.load(config)
 
     temp_client = None
     temp_secret = None
@@ -221,9 +214,6 @@ def download_playlist(config_path=CONFIG_DEFAULT_PATH, **kwargs):
             logger.error("no youtube authentication credentials provided")
             return
         
-    if cpath != config_path:
-        logger.warning("config path not found. using default path and config at: %s", cpath)
-
     platform = opts["playlist-master"]["platform"].lower()
     if platform == "spotify":
         download_spotify_playlist(opts["playlist-master"]["playlist_id"], opts, logger)
@@ -255,6 +245,17 @@ def download_spotify_playlist(playlistID, config, logger):
             logger.error("exception occurred while retrieving url for %s", track)
             logger.error(e, stack_info=True, exc_info=True)
             continue
+        
+        if config["playlist-master"]["sort"] and ytdlp_options["outtmpl"]:
+            out = ytdlp_options["outtmpl"]["default"]
+            i = 0
+            if '/' in out:
+                i = out.rindex('/') + 1
+            elif '\\' in out:
+                i = out.rindex('\\') + 1
+
+            out = out[:i] + f"{track.artists[0]}/{track.album_title if track.album_title else "Singles"}/" + out[i:]
+            ytdlp_options["outtmpl"]["default"] = out
 
         logger.info("downloading from url: %s", url)
         download(url, ytdlp_options, outputs)
@@ -279,17 +280,26 @@ def download_youtube_playlist(playlistID, config, logger):
 
     tracks = get_yt_tracks(playlistID, ytauth)
     for track in tracks:
+        track_info = Track.get_youtube_track_info(track, ThumbnailQuality[config["playlist-master"]["thumbnail_quality"].upper()].value if "thumbnail_quality" in config["playlist-master"] else 0, ytauth.get_album(track["album"]["id"]) if track["album"] else None, logger)
         url = f"https://music.youtube.com/watch?v={track["videoId"]}"
         logger.info("downloading from url: %s", url)
+
+        if config["playlist-master"]["sort"] and ytdlp_options["outtmpl"]:
+            out = ytdlp_options["outtmpl"]["default"]
+            i = 0
+            if '/' in out:
+                i = out.rindex('/') + 1
+            elif '\\' in out:
+                i = out.rindex('\\') + 1
+
+            out = out[:i] + f"{track_info.artists[0]}/{track_info.album_title if track_info.album_title else "Singles"}/" + out[i:]
+            ytdlp_options["outtmpl"]["default"] = out
+
         download(url, ytdlp_options, outputs)
         if not outputs[-1]:
             logger.warning("unable to apply metadata")
             continue
         
-        track_info = Track.get_youtube_track_info(track, ThumbnailQuality[config["playlist-master"]["thumbnail_quality"].upper()].value if "thumbnail_quality" in config["playlist-master"] else 0, ytauth.get_yt_album(track["album"]["id"]) if track["album"] else None, logger)
-        if not track_info:
-            logger.warning("problem retrieving track info for applying metadata; continuing")
-            continue
         m = music_tag.load_file(outputs[-1])
         r = apply_metadata(m, track_info, logger)
         if r:
