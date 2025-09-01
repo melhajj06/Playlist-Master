@@ -1,6 +1,5 @@
 import click
 from .downloader import download_playlist
-import pathlib
 import os
 
 @click.group("playlist-master")
