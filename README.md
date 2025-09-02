@@ -1,4 +1,4 @@
-# Spofity Youtube Playlist Converter - SpYtPlConv
+# Playlist Master
 ## Features:
 - Convert [Spotify](https://open.spotify.com/) playlists to [Youtube](https://www.youtube.com/) (TO BE ADDED)
 - Convert [Youtube](https://www.youtube.com/) playlists to [Spotify](https://open.spotify.com/) (TO BE ADDED)
@@ -11,6 +11,9 @@
 - [spotipy](https://github.com/spotipy-dev/spotipy)
 - [music_tag](https://github.com/KristoforMaynard/music-tag)
 - [click](https://github.com/pallets/click)
+
+## Installation
+`python -m pip install https://github.com/melhajj06/Playlist-Master`
 
 ## Usage
 See the [Wiki](https://github.com/melhajj06/Playlist-Master/wiki)
